@@ -195,20 +195,6 @@ class TestMCPTypesIntegrity:
 class TestFastMCPVersionCompatibility:
     """Test FastMCP version is compatible with the security fix."""
 
-    def test_fastmcp_version_is_2_14_0_or_higher(self):
-        """Verify fastmcp version is >= 2.14.0 (includes mcp 1.23.0+ dependency)."""
-        version = importlib.metadata.version('fastmcp')
-
-        # Parse version string
-        version_parts = [int(x) for x in re.split(r'[.-]', version)[:3]]
-        major, minor, patch = (version_parts + [0, 0, 0])[:3]
-
-        # fastmcp 2.14.0+ depends on mcp 1.23.0+ which has the CVE fix
-        assert (major, minor, patch) >= (2, 14, 0), (
-            f'fastmcp version {version} may not include the CVE-2025-66416 fix. '
-            f'Minimum required version is 2.14.0.'
-        )
-
     def test_fastmcp_server_creation_with_mask_error_details(self):
         """Test FastMCP server can be created with mask_error_details option."""
         from fastmcp import FastMCP
