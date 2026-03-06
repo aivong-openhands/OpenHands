@@ -120,7 +120,7 @@ class TestSSETransportSecurity:
         # Localhost URLs should work with the security fix
         transport = SSETransport(url='http://127.0.0.1:8080/sse')
         assert transport is not None
-        assert '127.0.0.1' in transport.url or 'localhost' in transport.url or True
+        assert any(host in str(transport.url) for host in ('127.0.0.1', 'localhost'))
 
 
 class TestStreamableHttpTransportSecurity:
