@@ -1,29 +1,14 @@
 version: 2
 updates:
+  # Python dependencies: Disable both version and security updates
+  # Security updates are managed manually to avoid automated PRs
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 1
-    groups:
-      # put packages in their own group if they have a history of breaking the build or needing to be reverted
-      pre-commit:
-        patterns:
-          - "pre-commit"
-      browsergym:
-        patterns:
-          - "browsergym*"
-      mcp-packages:
-        patterns:
-          - "mcp"
-      security-all:
-        applies-to: "security-updates"
-        patterns:
-          - "*"
-      version-all:
-        applies-to: "version-updates"
-        patterns:
-          - "*"
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
