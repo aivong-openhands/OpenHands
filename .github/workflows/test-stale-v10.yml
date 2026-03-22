@@ -4,9 +4,15 @@
 name: 'Test Stale v10'
 
 on:
-  # Can be manually triggered for testing
+  # Trigger on push to this branch to test immediately
+  push:
+    branches:
+      - 'av/test-stale-v10'
+    paths:
+      - '.github/workflows/test-stale-v10.yml'
+  # Can be manually triggered for testing (only works after merge to main)
   workflow_dispatch:
-  # Also runs on a schedule every 5 minutes for testing
+  # Also runs on a schedule every 5 minutes for testing (only works after merge to main)
   schedule:
     - cron: '*/5 * * * *'
 
