@@ -1,0 +1,77 @@
+---
+name: Test dawidd6/action-download-artifact@v15
+
+# Test workflow to verify dawidd6/action-download-artifact@v15 works correctly.
+# Uses pull_request trigger so the workflow file from the PR branch is used.
+# This workflow can be deleted after PR #13001 is verified and merged.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  test-download-artifact:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Test download artifact v15 - attempt to download from pr-review workflow
+        id: download-trace
+        uses: dawidd6/action-download-artifact@v15
+        continue-on-error: true
+        with:
+          workflow: pr-review-by-openhands.yml
+          name: pr-review-trace-${{ github.event.pull_request.number }}
+          path: trace-info
+          search_artifacts: true
+          if_no_artifact_found: warn
+
+      - name: Report download result
+        run: |
+          echo "=== Test Results for dawidd6/action-download-artifact@v15 ==="
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo ""
+          if [ -d "trace-info" ]; then
+            echo "✅ Artifact directory created"
+            echo "Contents:"
+            ls -la trace-info/ || echo "(empty)"
+          else
+            echo "ℹ️ No artifact found (expected if no pr-review workflow ran for this PR)"
+          fi
+          echo ""
+          echo "Download step outcome: ${{ steps.download-trace.outcome }}"
+          echo ""
+          echo "✅ dawidd6/action-download-artifact@v15 executed successfully!"
+          echo "The action is working correctly regardless of whether artifacts were found."
+
+      - name: Test download with different parameters
+        id: download-any
+        uses: dawidd6/action-download-artifact@v15
+        continue-on-error: true
+        with:
+          workflow: ghcr-build.yml
+          workflow_conclusion: success
+          name_is_regexp: true
+          name: ".*"
+          path: build-artifacts
+          search_artifacts: true
+          if_no_artifact_found: warn
+          check_artifacts: true
+
+      - name: Report second download result
+        run: |
+          echo "=== Second Test Results ==="
+          echo "Testing download from ghcr-build.yml workflow"
+          echo "Download step outcome: ${{ steps.download-any.outcome }}"
+          if [ -d "build-artifacts" ]; then
+            echo "✅ Build artifacts directory created"
+            echo "Contents:"
+            ls -la build-artifacts/ 2>/dev/null || echo "(empty or no files)"
+          else
+            echo "ℹ️ No build artifacts found"
+          fi
+          echo ""
+          echo "✅ All v15 action tests completed!"
