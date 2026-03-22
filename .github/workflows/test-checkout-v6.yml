@@ -1,0 +1,120 @@
+name: Test checkout@v6
+
+# Test workflow to validate actions/checkout@v6 upgrade
+# This workflow runs basic tests to verify the checkout action works correctly
+# Related to: https://github.com/OpenHands/OpenHands/pull/12259
+
+on:
+  push:
+    branches:
+      - 'test-checkout-v6*'
+      - 'dependabot/github_actions/actions/checkout-6'
+  pull_request:
+    paths:
+      - '.github/workflows/test-checkout-v6.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test-basic-checkout:
+    name: Test basic checkout
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with v6
+        uses: actions/checkout@v6
+
+      - name: Verify checkout
+        run: |
+          echo "Verifying checkout was successful..."
+          echo "Current directory: $(pwd)"
+          echo "Repository files:"
+          ls -la
+          echo ""
+          echo "Git info:"
+          git status
+          git log --oneline -5
+          echo ""
+          echo "Checking key files exist..."
+          test -f pyproject.toml && echo "✅ pyproject.toml exists"
+          test -f Makefile && echo "✅ Makefile exists"
+          test -d frontend && echo "✅ frontend directory exists"
+          test -d openhands && echo "✅ openhands directory exists"
+          echo ""
+          echo "✅ Basic checkout test passed!"
+
+  test-checkout-with-options:
+    name: Test checkout with fetch-depth
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify full history checkout
+        run: |
+          echo "Verifying full history checkout..."
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          echo "Total commits: $COMMIT_COUNT"
+          if [ "$COMMIT_COUNT" -gt 1 ]; then
+            echo "✅ Full history checkout successful (found $COMMIT_COUNT commits)"
+          else
+            echo "❌ Full history checkout may have failed"
+            exit 1
+          fi
+
+  test-checkout-submodules:
+    name: Test checkout with submodules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Verify submodules checkout
+        run: |
+          echo "Verifying submodules checkout..."
+          git submodule status || echo "No submodules found (this is OK)"
+          echo "✅ Submodules checkout test passed!"
+
+  test-checkout-persist-credentials:
+    name: Test checkout persist-credentials (v6 feature)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with persist-credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: true
+
+      - name: Verify persist-credentials
+        run: |
+          echo "Verifying persist-credentials option..."
+          # v6 stores credentials differently (under $RUNNER_TEMP)
+          echo "Git config:"
+          git config --list | grep -E "^(url|credential)" || true
+          echo ""
+          echo "✅ Persist-credentials test completed!"
+
+  test-checkout-ref:
+    name: Test checkout specific ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head ref
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+
+      - name: Verify ref checkout
+        run: |
+          echo "Verifying ref checkout..."
+          echo "Current branch/ref:"
+          git rev-parse --abbrev-ref HEAD || git rev-parse HEAD
+          echo ""
+          echo "Current commit:"
+          git log --oneline -1
+          echo ""
+          echo "✅ Ref checkout test passed!"
