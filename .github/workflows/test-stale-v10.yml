@@ -1,0 +1,40 @@
+# TEST WORKFLOW: Test stale action v10 upgrade with very short timeframes
+# This is a test workflow to verify actions/stale@v10 works correctly
+# DELETE THIS FILE AFTER TESTING IS COMPLETE
+name: 'Test Stale v10'
+
+on:
+  # Can be manually triggered for testing
+  workflow_dispatch:
+  # Also runs on a schedule every 5 minutes for testing
+  schedule:
+    - cron: '*/5 * * * *'
+
+jobs:
+  test-stale:
+    runs-on: ubuntu-latest
+    # Only run on the test PR branch, not on main/other repos
+    if: github.repository == 'OpenHands/OpenHands'
+    steps:
+      - uses: actions/stale@v10
+        with:
+          # Test messages clearly indicate this is a test
+          stale-issue-message: '[TEST] This issue is stale because it has been open for 5 minutes with no activity. Remove the stale label or leave a comment.'
+          stale-pr-message: '[TEST] This PR is stale because it has been open for 5 minutes with no activity. Remove the stale label or leave a comment.'
+          close-issue-message: '[TEST] This issue was closed due to 10 minutes of inactivity (test workflow).'
+          close-pr-message: '[TEST] This PR was closed due to 10 minutes of inactivity (test workflow).'
+          # Very short timeframes for testing (in days - minimum is fractions)
+          # Note: actions/stale doesn't support minutes directly, so we use very small fractions
+          # 5 minutes = 5/(24*60) ≈ 0.00347 days
+          # Using days-before-stale: 0 means immediately stale
+          # For practical testing, we'll use the smallest practical values
+          days-before-stale: 0
+          days-before-close: 0
+          # Only process test issues/PRs with a specific test label
+          only-labels: test-stale-v10
+          # Don't actually close anything during the test - just mark as stale
+          close-issue-reason: 'not_planned'
+          # Limit operations to prevent overwhelming the repo
+          operations-per-run: 10
+          # Enable debug output
+          debug-only: true
