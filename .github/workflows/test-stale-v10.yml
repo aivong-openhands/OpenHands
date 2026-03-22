@@ -19,8 +19,8 @@ on:
 jobs:
   test-stale:
     runs-on: ubuntu-latest
-    # Only run on the test PR branch, not on main/other repos
-    if: github.repository == 'OpenHands/OpenHands'
+    # Allow running on forks for testing, or on the main repo
+    if: github.repository == 'OpenHands/OpenHands' || github.repository == 'aivong-openhands/OpenHands'
     steps:
       - uses: actions/stale@v10
         with:
