@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TextIO
 
 from pythonjsonlogger.json import JsonFormatter
+from server.session_context import SessionContextFilter
 
 from openhands.core.logger import openhands_logger
 
@@ -24,6 +25,9 @@ SITE_PACKAGES_PREFIX = (
 )
 # Make the JSON easy to read in the console - useful for non cloud environments
 LOG_JSON_FOR_CONSOLE = int(os.getenv('LOG_JSON_FOR_CONSOLE', '0'))
+
+# Session context filter for automatic session_id injection
+_session_context_filter = SessionContextFilter()
 
 
 def format_stack(stack: str) -> list[str]:
@@ -79,8 +83,9 @@ def setup_json_logger(
     handler = logging.StreamHandler(_out)
     handler.setLevel(level)
 
+    # Include session_id and user_id in the format string for JSON output
     formatter = JsonFormatter(
-        '%(message)s%(levelname)s%(module)s%(funcName)s%(lineno)d',
+        '%(message)s%(levelname)s%(module)s%(funcName)s%(lineno)d%(session_id)s%(user_id)s',
         rename_fields={'levelname': 'severity'},
         json_serializer=custom_json_serializer,
         # Use 'ts' for consistency with LOG_JSON_FOR_CONSOLE mode (skip when console mode to avoid duplicates)
@@ -90,6 +95,9 @@ def setup_json_logger(
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     logger.setLevel(level)
+
+    # Add session context filter to inject session_id and user_id
+    logger.addFilter(_session_context_filter)
 
 
 def setup_all_loggers():

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import socketio
 from server.logger import logger
+from server.session_context import session_context
 from server.utils.conversation_callback_utils import invoke_conversation_callbacks
 from sqlalchemy import select
 from storage.database import a_session_maker
@@ -779,17 +780,19 @@ class ClusteredConversationManager(StandaloneConversationManager):
         # Add a subscriber for conversation callbacks
         def conversation_callback_handler(event):
             """Handle events by invoking conversation callbacks."""
-            try:
-                if isinstance(event, AgentStateChangedObservation):
-                    asyncio.run_coroutine_threadsafe(
-                        invoke_conversation_callbacks(sid, event), loop
+            # Set session context for logging in this callback (runs in different thread)
+            with session_context.scope(session_id=sid, user_id=user_id):
+                try:
+                    if isinstance(event, AgentStateChangedObservation):
+                        asyncio.run_coroutine_threadsafe(
+                            invoke_conversation_callbacks(sid, event), loop
+                        )
+                except Exception as e:
+                    logger.error(
+                        f'Error invoking conversation callbacks for {sid}: {str(e)}',
+                        extra={'error': str(e)},
+                        exc_info=True,
                     )
-            except Exception as e:
-                logger.error(
-                    f'Error invoking conversation callbacks for {sid}: {str(e)}',
-                    extra={'session_id': sid, 'error': str(e)},
-                    exc_info=True,
-                )
 
         # Subscribe to the event stream with our callback handler
         try:

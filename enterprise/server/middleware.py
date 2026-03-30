@@ -1,3 +1,4 @@
+import re
 from typing import Callable, cast
 
 import jwt
@@ -13,11 +14,53 @@ from server.auth.auth_error import (
 from server.auth.gitlab_sync import schedule_gitlab_repo_sync
 from server.auth.saas_user_auth import SaasUserAuth, token_manager
 from server.routes.auth import set_response_cookie
+from server.session_context import session_context
 from server.utils.url_utils import get_cookie_domain, get_cookie_samesite
 
 from openhands.core.logger import openhands_logger as logger
 from openhands.server.user_auth.user_auth import AuthType, UserAuth, get_user_auth
 from openhands.server.utils import config
+
+# Pattern to extract conversation/session ID from URL paths
+# Matches paths like /api/conversations/{id}/... or /api/v1/conversations/{id}/...
+_CONVERSATION_ID_PATTERN = re.compile(r'/api(?:/v\d+)?/conversations/([a-zA-Z0-9_-]+)')
+
+
+def _extract_session_id_from_path(path: str) -> str | None:
+    """Extract session/conversation ID from request path."""
+    match = _CONVERSATION_ID_PATTERN.search(path)
+    if match:
+        return match.group(1)
+    return None
+
+
+class SessionContextMiddleware:
+    """Middleware that sets session context for automatic logging.
+
+    This middleware extracts session/conversation ID from the request path
+    and sets it in the session context, making it automatically available
+    in all log messages within the request scope.
+    """
+
+    async def __call__(self, request: Request, call_next: Callable) -> Response:
+        # Extract session ID from path
+        session_id = _extract_session_id_from_path(request.url.path)
+
+        # Try to get user_id from request state if available
+        user_id: str | None = None
+        user_auth: UserAuth | None = getattr(request.state, 'user_auth', None)
+        if user_auth:
+            try:
+                user_id = await user_auth.get_user_id()
+            except Exception:
+                pass
+
+        # Set context and process request
+        token = session_context.set(session_id=session_id, user_id=user_id)
+        try:
+            return await call_next(request)
+        finally:
+            session_context.reset(token)
 
 
 class SetAuthCookieMiddleware:

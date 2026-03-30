@@ -15,6 +15,7 @@ import socketio
 from pydantic import SecretStr
 from server.auth.token_manager import TokenManager
 from server.constants import PERMITTED_CORS_ORIGINS, WEB_HOST
+from server.session_context import session_context
 from server.utils.conversation_callback_utils import (
     process_event,
     update_conversation_metadata,
@@ -307,7 +308,7 @@ class SaasNestedConversationManager(ConversationManager):
                 # If refresh fails, use original token to prevent conversation startup failure
                 logger.warning(
                     f'Failed to refresh {provider_type.value} token: {e}',
-                    extra={'session_id': sid, 'provider': provider_type.value},
+                    extra={'provider': provider_type.value},
                     exc_info=True,
                 )
                 updated_tokens[provider_type] = provider_token
@@ -322,7 +323,6 @@ class SaasNestedConversationManager(ConversationManager):
         logger.info(
             'Updated provider tokens after runtime creation',
             extra={
-                'session_id': sid,
                 'providers': [p.value for p in updated_tokens.keys()],
                 'refreshed': tokens_refreshed,
                 'failed': tokens_failed,
@@ -333,43 +333,45 @@ class SaasNestedConversationManager(ConversationManager):
     async def _start_agent_loop(
         self, sid, settings, user_id, initial_user_msg=None, replay_json=None
     ):
-        try:
-            logger.info(f'starting_agent_loop:{sid}', extra={'session_id': sid})
-            await self.ensure_num_conversations_below_limit(sid, user_id)
-            provider_handler = self._get_provider_handler(settings)
-            runtime = await self._create_runtime(
-                sid, user_id, settings, provider_handler
-            )
-            await runtime.connect()
+        # Set session context for all logging within this method
+        with session_context.scope(session_id=sid, user_id=user_id):
+            try:
+                logger.info(f'starting_agent_loop:{sid}')
+                await self.ensure_num_conversations_below_limit(sid, user_id)
+                provider_handler = self._get_provider_handler(settings)
+                runtime = await self._create_runtime(
+                    sid, user_id, settings, provider_handler
+                )
+                await runtime.connect()
 
-            if not self._runtime_container_image:
-                self._runtime_container_image = getattr(
-                    runtime,
-                    'container_image',
-                    self.config.sandbox.runtime_container_image,
+                if not self._runtime_container_image:
+                    self._runtime_container_image = getattr(
+                        runtime,
+                        'container_image',
+                        self.config.sandbox.runtime_container_image,
+                    )
+
+                session_api_key = runtime.session.headers['X-Session-API-Key']
+
+                # Update provider tokens with fresh ones after runtime creation
+                settings = await self._refresh_provider_tokens_after_runtime_init(
+                    settings, sid, user_id
                 )
 
-            session_api_key = runtime.session.headers['X-Session-API-Key']
-
-            # Update provider tokens with fresh ones after runtime creation
-            settings = await self._refresh_provider_tokens_after_runtime_init(
-                settings, sid, user_id
-            )
-
-            await self._start_conversation(
-                sid,
-                user_id,
-                settings,
-                initial_user_msg,
-                replay_json,
-                runtime.runtime_url,
-                session_api_key,
-            )
-        finally:
-            # remove the starting entry from redis
-            redis = self._get_redis_client()
-            key = self._get_redis_conversation_key(user_id, sid)
-            await redis.delete(key)
+                await self._start_conversation(
+                    sid,
+                    user_id,
+                    settings,
+                    initial_user_msg,
+                    replay_json,
+                    runtime.runtime_url,
+                    session_api_key,
+                )
+            finally:
+                # remove the starting entry from redis
+                redis = self._get_redis_client()
+                key = self._get_redis_conversation_key(user_id, sid)
+                await redis.delete(key)
 
     async def _start_conversation(
         self,
@@ -793,10 +795,7 @@ class SaasNestedConversationManager(ConversationManager):
     async def ensure_num_conversations_below_limit(self, sid: str, user_id: str):
         response_ids = await self.get_running_agent_loops(user_id)
         if len(response_ids) >= self.config.max_concurrent_conversations:
-            logger.info(
-                f'too_many_sessions_for:{user_id or ""}',
-                extra={'session_id': sid, 'user_id': user_id},
-            )
+            logger.info(f'too_many_sessions_for:{user_id or ""}')
             # Get the conversations sorted (oldest first)
             conversation_store = await self._get_conversation_store(user_id)
             conversations = await conversation_store.get_all_metadata(response_ids)
@@ -806,7 +805,7 @@ class SaasNestedConversationManager(ConversationManager):
                 oldest_conversation_id = conversations.pop().conversation_id
                 logger.debug(
                     f'closing_from_too_many_sessions:{user_id or ""}:{oldest_conversation_id}',
-                    extra={'session_id': oldest_conversation_id, 'user_id': user_id},
+                    extra={'closing_conversation_id': oldest_conversation_id},
                 )
                 # Send status message to client and close session.
                 status_update_dict = {
