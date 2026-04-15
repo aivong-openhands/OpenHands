@@ -131,8 +131,14 @@ def test_featurizer_embed_batch(samples, batch_size, featurizer, mock_llm_config
 
 def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monkeypatch):
     """Test embed_batch maintains correct ordering and handles concurrent execution safely."""
-    import time
+    import threading
     from unittest.mock import MagicMock
+
+    batch_size = 20
+
+    # Barrier ensures all threads are in-flight simultaneously before any returns,
+    # guaranteeing genuine concurrent execution without real delays.
+    barrier = threading.Barrier(batch_size)
 
     # Create unique responses for each issue to verify ordering
     def create_mock_response(issue_index):
@@ -149,7 +155,7 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
         mock_response.usage.completion_tokens = 5 + issue_index
         return mock_response
 
-    # Track call order and add delays to simulate varying processing times
+    # Track call order to verify all issues were processed
     call_count = 0
     call_order = []
 
@@ -161,10 +167,9 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
         issue_index = int(message_content.split('Issue ')[-1])
         call_order.append(issue_index)
 
-        # Add varying delays to simulate real-world conditions
-        # Later issues process faster to test race conditions
-        delay = 0.01 * (20 - issue_index)
-        time.sleep(delay)
+        # Hold until all threads are running, then release simultaneously.
+        # This creates genuine concurrent execution without wall-clock delays.
+        barrier.wait()
 
         call_count += 1
         return create_mock_response(issue_index)
@@ -178,8 +183,6 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
         'integrations.solvability.models.featurizer.LLM', mock_llm_class
     )
 
-    # Test with a large enough batch to stress concurrency
-    batch_size = 20
     issues = [f'Issue {i}' for i in range(batch_size)]
 
     embeddings = featurizer.embed_batch(issues, llm_config=mock_llm_config, samples=1)
@@ -187,7 +190,9 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
     # Verify we got all embeddings
     assert len(embeddings) == batch_size
 
-    # Verify each embedding corresponds to its correct issue index
+    # Verify each embedding corresponds to its correct issue index.
+    # This is the key ordering assertion: results must match input order
+    # even though threads completed concurrently.
     for i, embedding in enumerate(embeddings):
         assert len(embedding.samples) == 1
         sample = embedding.samples[0]
