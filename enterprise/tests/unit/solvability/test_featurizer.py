@@ -1,3 +1,7 @@
+import concurrent.futures
+import threading
+from unittest.mock import MagicMock
+
 import pytest
 from integrations.solvability.models.featurizer import Feature, FeatureEmbedding
 
@@ -131,14 +135,19 @@ def test_featurizer_embed_batch(samples, batch_size, featurizer, mock_llm_config
 
 def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monkeypatch):
     """Test embed_batch maintains correct ordering and handles concurrent execution safely."""
-    import threading
-    from unittest.mock import MagicMock
-
     batch_size = 20
 
     # Barrier ensures all threads are in-flight simultaneously before any returns,
     # guaranteeing genuine concurrent execution without real delays.
     barrier = threading.Barrier(batch_size)
+
+    # Force the executor to use exactly batch_size workers so all tasks can reach
+    # the barrier simultaneously — the default max_workers on low-CPU CI machines
+    # can be fewer than batch_size, which would cause a permanent deadlock.
+    monkeypatch.setattr(
+        'integrations.solvability.models.featurizer.ThreadPoolExecutor',
+        lambda *args, **kwargs: concurrent.futures.ThreadPoolExecutor(max_workers=batch_size),
+    )
 
     # Create unique responses for each issue to verify ordering
     def create_mock_response(issue_index):
@@ -169,7 +178,12 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
 
         # Hold until all threads are running, then release simultaneously.
         # This creates genuine concurrent execution without wall-clock delays.
-        barrier.wait()
+        try:
+            barrier.wait(timeout=5)
+        except threading.BrokenBarrierError:
+            pytest.fail(
+                'Not all worker threads reached the barrier; concurrent fan-out assumption failed.'
+            )
 
         call_count += 1
         return create_mock_response(issue_index)
@@ -215,8 +229,6 @@ def test_featurizer_embed_batch_exception_handling(
     featurizer, mock_llm_config, monkeypatch
 ):
     """Test embed_batch handles exceptions in individual tasks correctly."""
-    from unittest.mock import MagicMock
-
     def mock_completion(*args, **kwargs):
         # Extract issue index from the message content
         messages = kwargs.get('messages', args[0] if args else [])
