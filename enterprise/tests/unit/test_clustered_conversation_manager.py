@@ -730,11 +730,12 @@ async def test_cleanup_stale_integration():
     ):
         async with ClusteredConversationManager(
             sio, OpenHandsConfig(), InMemoryFileStore(), MonitoringListener()
-        ):
-            # Let the cleanup task run for a short time
-            await asyncio.sleep(0.05)
+        ) as conversation_manager:
+            # should_continue is mocked [True, True, False], so the cleanup task
+            # runs exactly 2 iterations then exits — await it directly instead of
+            # relying on wall-clock timing.
+            await conversation_manager._cleanup_task
 
-            # Verify: Both methods should be called at least once
-            # The exact number of calls may vary due to timing, so we check for at least 1
+            # Verify: Both methods are called once per iteration (2 total)
             assert disconnect_from_stopped_mock.await_count >= 1
             assert close_disconnected_mock.await_count >= 1
