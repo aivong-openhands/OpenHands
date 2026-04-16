@@ -167,11 +167,9 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
         return mock_response
 
     # Track call order to verify all issues were processed
-    call_count = 0
     call_order = []
 
     def mock_completion(*args, **kwargs):
-        nonlocal call_count
         # Extract issue index from the message content
         messages = kwargs.get('messages', args[0] if args else [])
         message_content = messages[1]['content']
@@ -187,7 +185,6 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
                 'Not all worker threads reached the barrier; concurrent fan-out assumption failed.'
             )
 
-        call_count += 1
         return create_mock_response(issue_index)
 
     def mock_llm_class(*args, **kwargs):
@@ -223,7 +220,7 @@ def test_featurizer_embed_batch_thread_safety(featurizer, mock_llm_config, monke
         assert embedding.completion_tokens == 5 + i
 
     # Verify all issues were processed
-    assert call_count == batch_size
+    assert len(call_order) == batch_size
     assert len(set(call_order)) == batch_size  # All unique indices
 
 
