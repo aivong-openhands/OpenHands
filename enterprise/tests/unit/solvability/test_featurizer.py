@@ -3,7 +3,6 @@ import threading
 from unittest.mock import MagicMock
 
 import pytest
-
 from integrations.solvability.models.featurizer import Feature, FeatureEmbedding
 
 
