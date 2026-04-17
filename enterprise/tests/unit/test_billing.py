@@ -94,6 +94,20 @@ def mock_stripe_session_retrieve():
 
 
 @pytest.fixture
+def mock_setup_request():
+    """Create a mock request object for customer setup session tests."""
+    return Request(
+        scope={
+            'type': 'http',
+            'scheme': 'http',
+            'server': ('test.com', 80),
+            'path': '/api/billing/create-customer-setup-session',
+            'headers': [],
+        }
+    )
+
+
+@pytest.fixture
 def patched_checkout_session_makers(async_session_maker):
     """Patch all session makers needed for checkout session tests."""
     with (
@@ -580,45 +594,22 @@ async def test_cancel_callback_success(
 
 
 @pytest.mark.asyncio
-async def test_has_payment_method_with_payment_method():
-    """Test has_payment_method returns True when user has a payment method."""
-    mock_has_payment_method = AsyncMock(return_value=True)
+@pytest.mark.parametrize('has_method', [True, False])
+async def test_has_payment_method(has_method):
+    """Test has_payment_method reflects the underlying stripe service result."""
+    mock_fn = AsyncMock(return_value=has_method)
     with patch(
         'server.routes.billing.stripe_service.has_payment_method_by_user_id',
-        mock_has_payment_method,
+        mock_fn,
     ):
         result = await has_payment_method('mock_user')
-        assert result is True
-    mock_has_payment_method.assert_called_once_with('mock_user')
+        assert result is has_method
+    mock_fn.assert_called_once_with('mock_user')
 
 
 @pytest.mark.asyncio
-async def test_has_payment_method_without_payment_method():
-    """Test has_payment_method returns False when user has no payment method."""
-    mock_has_payment_method = AsyncMock(return_value=False)
-    with patch(
-        'server.routes.billing.stripe_service.has_payment_method_by_user_id',
-        mock_has_payment_method,
-    ):
-        mock_has_payment_method.return_value = False
-        result = await has_payment_method('mock_user')
-        assert result is False
-    mock_has_payment_method.assert_called_once_with('mock_user')
-
-
-@pytest.mark.asyncio
-async def test_create_customer_setup_session_success():
+async def test_create_customer_setup_session_success(mock_setup_request):
     """Test successful creation of customer setup session."""
-    mock_request = Request(
-        scope={
-            'type': 'http',
-            'scheme': 'http',
-            'server': ('test.com', 80),
-            'path': '/api/billing/create-customer-setup-session',
-            'headers': [],
-        }
-    )
-
     mock_customer_info = {'customer_id': 'mock-customer-id', 'org_id': 'mock-org-id'}
     mock_session = MagicMock()
     mock_session.url = 'https://checkout.stripe.com/test-session'
@@ -632,7 +623,7 @@ async def test_create_customer_setup_session_success():
         patch('stripe.checkout.Session.create_async', mock_create),
         patch('server.routes.billing.validate_billing_enabled'),
     ):
-        result = await create_customer_setup_session(mock_request, 'mock_user')
+        result = await create_customer_setup_session(mock_setup_request, 'mock_user')
 
         assert isinstance(result, billing.CreateBillingSessionResponse)
         assert result.redirect_url == 'https://checkout.stripe.com/test-session'
