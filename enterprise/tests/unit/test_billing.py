@@ -7,7 +7,6 @@ import stripe
 from fastapi import HTTPException, Request, status
 from httpx import Response
 from sqlalchemy import select
-from starlette.datastructures import URL
 
 from server.constants import ORG_SETTINGS_VERSION
 from server.routes import billing
@@ -42,37 +41,43 @@ def mock_request():
 @pytest.fixture
 def mock_checkout_request():
     """Create a mock request object for checkout session tests."""
-    request = Request(
+    return Request(
         scope={
             'type': 'http',
-            'path': '/api/billing/create-checkout-session',
+            'scheme': 'http',
             'server': ('test.com', 80),
+            'path': '/api/billing/create-checkout-session',
+            'headers': [],
         }
     )
-    request._url = URL('http://test.com/')
-    return request
 
 
 @pytest.fixture
 def mock_subscription_request():
     """Create a mock request object for subscription checkout session tests."""
-    request = Request(
+    return Request(
         scope={
             'type': 'http',
-            'path': '/api/billing/subscription-checkout-session',
+            'scheme': 'http',
             'server': ('test.com', 80),
+            'path': '/api/billing/subscription-checkout-session',
+            'headers': [],
         }
     )
-    request._url = URL('http://test.com/')
-    return request
 
 
 @pytest.fixture
 def mock_callback_request():
     """Create a mock request object for success/cancel callback tests."""
-    request = Request(scope={'type': 'http'})
-    request._url = URL('http://test.com/')
-    return request
+    return Request(
+        scope={
+            'type': 'http',
+            'scheme': 'http',
+            'server': ('test.com', 80),
+            'path': '/api/billing/callback',
+            'headers': [],
+        }
+    )
 
 
 @pytest.fixture
@@ -609,12 +614,12 @@ async def test_create_customer_setup_session_success():
     mock_request = Request(
         scope={
             'type': 'http',
-            'path': '/api/billing/create-customer-setup-session',
+            'scheme': 'http',
             'server': ('test.com', 80),
+            'path': '/api/billing/create-customer-setup-session',
             'headers': [],
         }
     )
-    mock_request._url = URL('http://test.com/')
 
     mock_customer_info = {'customer_id': 'mock-customer-id', 'org_id': 'mock-org-id'}
     mock_session = MagicMock()
