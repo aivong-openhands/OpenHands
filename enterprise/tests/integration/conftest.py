@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 import pytest
@@ -29,6 +30,11 @@ from storage.stored_offline_token import StoredOfflineToken  # noqa: F401
 from storage.stripe_customer import StripeCustomer  # noqa: F401
 from storage.user import User  # noqa: F401
 from storage.user_settings import UserSettings  # noqa: F401
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        item.add_marker(pytest.mark.integration)
 
 
 @pytest.fixture(autouse=True)
@@ -76,8 +82,6 @@ def async_engine(db_path):
     async def create_tables():
         async with async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-
-    import asyncio
 
     asyncio.run(create_tables())
     return async_engine
