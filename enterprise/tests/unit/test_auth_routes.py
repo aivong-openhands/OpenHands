@@ -6,9 +6,7 @@ import jwt
 import pytest
 from fastapi import HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from openhands.integrations.service_types import ProviderType
 from pydantic import SecretStr
-
 from server.auth.auth_error import AuthError
 from server.auth.saas_user_auth import SaasUserAuth
 from server.auth.user.user_authorizer import UserAuthorizationResponse, UserAuthorizer
@@ -20,6 +18,8 @@ from server.routes.auth import (
     logout,
     set_response_cookie,
 )
+
+from openhands.integrations.service_types import ProviderType
 
 
 def create_mock_user_authorizer(success: bool = True, error_detail: str | None = None):
