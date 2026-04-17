@@ -1,0 +1,42 @@
+name: Run Enterprise Integration Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test-enterprise-integration:
+    name: Enterprise Python Integration Tests
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install poetry via pipx
+        run: pipx install poetry
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "poetry"
+      - name: Install Python dependencies using Poetry
+        working-directory: ./enterprise
+        run: poetry install --with dev,test
+      - name: Run Integration Tests
+        # Use base working directory for coverage paths to line up.
+        run: PYTHONPATH=".:$PYTHONPATH" poetry run --project=enterprise pytest --forked -n auto -s -p no:ddtrace -p no:ddtrace.pytest_bdd -p no:ddtrace.pytest_benchmark ./enterprise/tests/integration --cov=enterprise --cov-branch
+        env:
+          COVERAGE_FILE: ".coverage.enterprise.integration.${{ matrix.python_version }}"
+      - name: Store coverage file
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-enterprise-integration
+          path: ".coverage.enterprise.integration.${{ matrix.python_version }}"
+          include-hidden-files: true
