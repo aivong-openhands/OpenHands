@@ -6,8 +6,6 @@ import pytest
 import stripe
 from fastapi import HTTPException, Request, status
 from httpx import Response
-from sqlalchemy import select
-
 from server.constants import ORG_SETTINGS_VERSION
 from server.routes import billing
 from server.routes.billing import (
@@ -21,6 +19,7 @@ from server.routes.billing import (
     has_payment_method,
     success_callback,
 )
+from sqlalchemy import select
 from storage.billing_session import BillingSession
 from storage.org import Org
 from storage.user import User
