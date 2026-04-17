@@ -3,17 +3,17 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from openhands.sdk.settings import AgentSettings
+from openhands.storage.data_models.settings import Settings
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+
 from storage.org import Org
 from storage.org_invitation import OrgInvitation
 from storage.org_member import OrgMember
 from storage.org_store import OrgStore
 from storage.role import Role
 from storage.user import User
-
-from openhands.sdk.settings import AgentSettings
-from openhands.storage.data_models.settings import Settings
 
 
 @pytest.fixture
