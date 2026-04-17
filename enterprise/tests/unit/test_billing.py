@@ -99,7 +99,6 @@ def patched_checkout_session_makers(async_session_maker):
     with (
         patch('server.routes.billing.a_session_maker', async_session_maker),
         patch('integrations.stripe_service.a_session_maker', async_session_maker),
-        patch('storage.database.a_session_maker', async_session_maker),
         patch('storage.org_store.a_session_maker', async_session_maker),
     ):
         yield
@@ -297,7 +296,7 @@ async def test_create_checkout_session_success(
 
 @pytest.mark.asyncio
 async def test_success_callback_session_not_found(
-    patched_billing_session_maker, mock_callback_request, mock_stripe_session_retrieve
+    patched_billing_session_maker, mock_callback_request
 ):
     """Test success callback when billing session is not found."""
     with pytest.raises(HTTPException) as exc_info:
