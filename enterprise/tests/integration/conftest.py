@@ -1,4 +1,3 @@
-import asyncio
 import os
 
 import pytest
@@ -32,7 +31,7 @@ from storage.user import User  # noqa: F401
 from storage.user_settings import UserSettings  # noqa: F401
 
 
-def pytest_collection_modifyitems(items):
+def pytest_collection_modifyitems(config, items):
     for item in items:
         item.add_marker(pytest.mark.integration)
 
@@ -63,7 +62,10 @@ def engine(db_path):
         f'sqlite:///{db_path}', connect_args={'check_same_thread': False}
     )
     Base.metadata.create_all(engine)
-    return engine
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture
@@ -72,19 +74,19 @@ def session_maker(engine):
 
 
 @pytest.fixture
-def async_engine(db_path):
-    """Create an async engine using the SAME file-based database."""
-    async_engine = create_async_engine(
+def async_engine(engine, db_path):
+    """Create an async engine using the SAME file-based database.
+
+    Depends on engine so tables are already created before async tests run.
+    """
+    ae = create_async_engine(
         f'sqlite+aiosqlite:///{db_path}',
         connect_args={'check_same_thread': False},
     )
-
-    async def create_tables():
-        async with async_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-    asyncio.run(create_tables())
-    return async_engine
+    try:
+        yield ae
+    finally:
+        ae.dispose()
 
 
 @pytest.fixture

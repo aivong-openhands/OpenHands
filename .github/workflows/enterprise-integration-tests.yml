@@ -33,10 +33,10 @@ jobs:
         # Use base working directory for coverage paths to line up.
         run: PYTHONPATH=".:$PYTHONPATH" poetry run --project=enterprise pytest --forked -n auto -s -p no:ddtrace -p no:ddtrace.pytest_bdd -p no:ddtrace.pytest_benchmark ./enterprise/tests/integration --cov=enterprise --cov-branch
         env:
-          COVERAGE_FILE: ".coverage.enterprise.integration.${{ matrix.python_version }}"
+          COVERAGE_FILE: ".coverage.enterprise.integration.${{ matrix.python-version }}"
       - name: Store coverage file
         uses: actions/upload-artifact@v7
         with:
           name: coverage-enterprise-integration
-          path: ".coverage.enterprise.integration.${{ matrix.python_version }}"
+          path: ".coverage.enterprise.integration.${{ matrix.python-version }}"
           include-hidden-files: true
