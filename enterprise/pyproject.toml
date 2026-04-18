@@ -92,6 +92,9 @@ lint.pydocstyle.convention = "google"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+  "integration: mark test as requiring a real database (deselect with '-m not integration')",
+]
 
 [tool.coverage.run]
 relative_files = true
